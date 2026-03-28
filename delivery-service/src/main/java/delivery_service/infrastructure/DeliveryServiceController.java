@@ -3,15 +3,15 @@ package delivery_service.infrastructure;
 import delivery_service.application.*;
 import delivery_service.domain.*;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.VerticleBase;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.handler.StaticHandler;
+import kafka.InputEventChannel;
+import kafka.OutputEventChannel;
 
 import java.util.Calendar;
 import java.util.Optional;
@@ -24,7 +24,7 @@ import java.util.logging.Logger;
 */
 public class DeliveryServiceController extends VerticleBase  {
 
-	private final int port;
+	private final String evChannelsLocation;
 	static Logger logger = Logger.getLogger("[Delivery Service Controller]");
 
 	static final String API_VERSION = "v1";
@@ -36,40 +36,43 @@ public class DeliveryServiceController extends VerticleBase  {
 
 	/* Health check endpoint */
 	static final String HEALTH_CHECK_ENDPOINT = "/api/" + API_VERSION + "/health";
+
+	/* Static channels */
+	static final String CREATE_DELIVERY_REQUESTS_EVC = "create-delivery-requests";
+	static final String CREATE_DELIVERY_REQUESTS_APPROVED_EVC = "create-delivery-requests-approved";
+	static final String CREATE_DELIVERY_REQUESTS_REJECTED_EVC = "create-delivery-requests-rejected";
+	static final String NEW_DELIVERY_CREATED_EVC = "new-delivery-created";
+
+	/* Dynamic channels */
+	static final String DELIVERY_TRACKING_REQUESTS_EVC = "delivery-{id}-tracking-requests";
+	static final String DELIVERY_TRACKING_REQUESTS_APPROVED_EVC = "delivery-{id}-tracking-requests-approved";
+	static final String DELIVERY_TRACKING_REQUESTS_REJECTED_EVC = "delivery-{id}-tracking-requests-rejected";
+	static final String TRACKING_DELIVERY_EVC = "tracking-delivery-{id}-events";
 	
 	/* Ref. to the application layer */
 	private final DeliveryService deliveryService;
-	
-	public DeliveryServiceController(final DeliveryService deliveryService, final int port) {
-		this.port = port;
+
+	private InputEventChannel createDeliveryRequests;
+	private OutputEventChannel createDeliveryRequestsApproved;
+	private OutputEventChannel createDeliveryRequestsRejected;
+	private OutputEventChannel newDeliveryCreated;
+
+	public DeliveryServiceController(final DeliveryService deliveryService, final String evChannelsLocation) {
 		this.deliveryService = deliveryService;
+		this.evChannelsLocation = evChannelsLocation;
 	}
 
 	public Future<?> start() {
 		logger.info("Delivery Service initializing...");
-		HttpServer server = vertx.createHttpServer();
-				
-		Router router = Router.router(vertx);
-		router.route(HttpMethod.POST, DELIVERIES_RESOURCE_PATH).handler(this::createNewDelivery);
-		router.route(HttpMethod.GET, DELIVERY_RESOURCE_PATH).handler(this::getDeliveryDetail);
-		router.route(HttpMethod.POST, TRACK_RESOURCE_PATH).handler(this::trackDelivery);
-		router.route(HttpMethod.POST, STOP_TRACKING_RESOURCE_PATH).handler(this::stopTrackingDelivery);
-		router.route(HttpMethod.GET, TRACKING_RESOURCE_PATH).handler(this::getDeliveryStatus);
-		router.route(HttpMethod.GET, HEALTH_CHECK_ENDPOINT).handler(this::healthCheckHandler);
-		this.handleEventSubscription(server, "/api/" + API_VERSION + "/events");
-
-		/* static files */
-		router.route("/public/*").handler(StaticHandler.create());
-		
-		/* start the server */
-		var fut = server
-			.requestHandler(router)
-			.listen(this.port);
-		fut.onSuccess(res -> {
-			logger.info("Delivery Service ready - port: " + this.port);
-		});
-
-		return fut;
+		this.createDeliveryRequests = new InputEventChannel(vertx, CREATE_DELIVERY_REQUESTS_EVC,
+				this.evChannelsLocation);
+		this.createDeliveryRequestsApproved = new OutputEventChannel(vertx, CREATE_DELIVERY_REQUESTS_APPROVED_EVC,
+				this.evChannelsLocation);
+		this.createDeliveryRequestsRejected = new OutputEventChannel(vertx, CREATE_DELIVERY_REQUESTS_REJECTED_EVC,
+				this.evChannelsLocation);
+		this.newDeliveryCreated = new OutputEventChannel(vertx, NEW_DELIVERY_CREATED_EVC, evChannelsLocation);
+		this.createDeliveryRequests.init(this::createNewDelivery);
+		return Promise.promise().future();
 	}
 
 	protected void healthCheckHandler(final RoutingContext context) {
@@ -82,46 +85,57 @@ public class DeliveryServiceController extends VerticleBase  {
 	/**
 	 * 
 	 * Create a New Delivery - by users logged in (with a UserSession)
-	 * 
-	 * @param context
+	 *
 	 */
-	protected void createNewDelivery(final RoutingContext context) {
-		logger.info("CreateNewDelivery request - " + context.currentRoute().getPath());
-		context.request().handler(buf -> {
-			final JsonObject deliveryDetailJson = buf.toJsonObject();
-			var reply = new JsonObject();
-			try {
-				final Optional<Calendar> expectedShippingMoment =
-						DeliveryJsonConverter.getExpectedShippingMoment(deliveryDetailJson);
-				if (expectedShippingMoment.isPresent() && TimeConverter.getZonedDateTime(expectedShippingMoment.get())
-						.isBefore(TimeConverter.getNowAsZonedDateTime())
-				) {
-					reply.put("result", "error");
-					reply.put("error", "past-shipping-moment");
-				} else if (expectedShippingMoment.isPresent()
-						&& TimeConverter.getZonedDateTime(expectedShippingMoment.get()).isAfter(
-                                        TimeConverter.getNowAsZonedDateTime().plusDays(14))
-				) {
-					reply.put("result", "error");
-					reply.put("error", "shipping-moment-too-far");
-				} else {
-					final DeliveryId deliveryId = this.deliveryService.createNewDelivery(
-							deliveryDetailJson.getNumber("weight").doubleValue(),
-							DeliveryJsonConverter.getAddress(deliveryDetailJson, "startingPlace"),
-							DeliveryJsonConverter.getAddress(deliveryDetailJson, "destinationPlace"),
-							expectedShippingMoment
-					);
-					reply.put("result", "ok");
-					reply.put("deliveryId", deliveryId.id());
-					reply.put("deliveryLink", DELIVERY_RESOURCE_PATH.replace(":deliveryId", deliveryId.id()));
-					reply.put("trackDeliveryLink", TRACK_RESOURCE_PATH.replace(":deliveryId", deliveryId.id()));
-				}
-				sendReply(context.response(), reply);
-			} catch (final Exception ex) {
-				logger.severe(ex.getMessage());
-				sendError(context.response());
+	protected void createNewDelivery(final JsonObject createDeliveryEvent) {
+		logger.info("CreateNewDelivery request");
+		final String deliveryId = createDeliveryEvent.getString("deliveryId");
+		final String requestId = createDeliveryEvent.getString("requestId");
+		try {
+			final Optional<Calendar> expectedShippingMoment = DeliveryJsonConverter
+					.getExpectedShippingMoment(createDeliveryEvent);
+			if (expectedShippingMoment.isPresent() && TimeConverter.getZonedDateTime(expectedShippingMoment.get())
+					.isBefore(TimeConverter.getNowAsZonedDateTime())
+			) {
+				this.postCreateDeliveryRequestRejected(requestId, "past-shipping-moment");
+			} else if (expectedShippingMoment.isPresent()
+					&& TimeConverter.getZonedDateTime(expectedShippingMoment.get()).isAfter(
+					TimeConverter.getNowAsZonedDateTime().plusDays(14))
+			) {
+				this.postCreateDeliveryRequestRejected(requestId, "shipping-moment-too-far");
+			} else {
+				this.deliveryService.createNewDelivery(
+						createDeliveryEvent.getNumber("weight").doubleValue(),
+						DeliveryJsonConverter.getAddress(createDeliveryEvent, "startingPlace"),
+						DeliveryJsonConverter.getAddress(createDeliveryEvent, "destinationPlace"),
+						expectedShippingMoment
+				);
+				final JsonObject evDeliveryCreated = new JsonObject();
+				evDeliveryCreated.put("deliveryId", deliveryId);
+				this.newDeliveryCreated.postEvent(evDeliveryCreated)
+						.onSuccess(v -> logger.info("Post event about new delivery succeeded"))
+						.onFailure(v -> logger.info("Post event about new delivery failed"));
+				final JsonObject evDeliveryApproved = new JsonObject();
+				evDeliveryApproved.put("deliveryId", deliveryId);
+				evDeliveryApproved.put("requestId", requestId);
+				this.createDeliveryRequestsApproved.postEvent(evDeliveryApproved)
+						.onSuccess(v -> {
+							logger.info("Create delivery request approved");
+							final InputEventChannel deliveryTrackingRequests = new InputEventChannel(vertx,
+									replaceWithId(DELIVERY_TRACKING_REQUESTS_EVC, deliveryId), this.evChannelsLocation);
+							final OutputEventChannel deliveryTrackingRequestsApproved = new OutputEventChannel(vertx,
+									replaceWithId(DELIVERY_TRACKING_REQUESTS_APPROVED_EVC, deliveryId),
+									this.evChannelsLocation);
+							final OutputEventChannel deliveryTrackingRequestsRejected = new OutputEventChannel(vertx,
+									replaceWithId(DELIVERY_TRACKING_REQUESTS_REJECTED_EVC, deliveryId),
+									this.evChannelsLocation);
+							deliveryTrackingRequests.init(e -> this.trackDelivery(e,
+									deliveryTrackingRequestsApproved, deliveryTrackingRequestsRejected));
+						});
 			}
-		});		
+		} catch (final Exception e) {
+			this.postCreateDeliveryRequestRejected(requestId, "create-delivery-error");
+		}
 	}
 
 	/**
@@ -157,29 +171,37 @@ public class DeliveryServiceController extends VerticleBase  {
 	 * Track a Delivery - by user logged in (with a UserSession)
 	 * 
 	 * It creates a TrackingSession
-	 * 
-	 * @param context
+	 *
 	 */
-	protected void trackDelivery(final RoutingContext context) {
-		logger.info("TrackDelivery request - " + context.currentRoute().getPath());
-		context.request().endHandler(h -> {
-			final DeliveryId deliveryId = new DeliveryId(context.pathParam("deliveryId"));
-			logger.info("Track delivery " + deliveryId.id());
-			var reply = new JsonObject();
-			try {
-				final TrackingSession trackingSession = this.deliveryService.trackDelivery(deliveryId,
-						new VertxTrackingSessionEventObserver(vertx.eventBus()));
-				reply.put("trackingSessionId", trackingSession.getId());
-				reply.put("result", "ok");
-				sendReply(context.response(), reply);
-			} catch (final DeliveryNotFoundException ex) {
-				reply.put("result", "error");
-				reply.put("error", ex.getMessage());
-				sendReply(context.response(), reply);
-			} catch (Exception ex1) {
-				sendError(context.response());
+	protected void trackDelivery(
+			final JsonObject trackDeliveryEvent,
+			final OutputEventChannel deliveryTrackingRequestsApproved,
+			final OutputEventChannel deliveryTrackingRequestsRejected
+	) {
+		logger.info("TrackDelivery request");
+		final String requestId = trackDeliveryEvent.getString("requestId");
+		final String deliveryId = trackDeliveryEvent.getString("deliveryId");
+		try {
+			final TrackingSession trackingSession = this.deliveryService.trackDelivery(new DeliveryId(deliveryId),
+					new KafkaTrackingSessionEventObserver());
+			final JsonObject evTrackingDeliveryApproved = new JsonObject();
+			evTrackingDeliveryApproved.put("trackingSessionId", trackingSession.getId());
+			evTrackingDeliveryApproved.put("requestId", requestId);
+			deliveryTrackingRequestsApproved.postEvent(evTrackingDeliveryApproved)
+					.onSuccess(v -> logger.info("Track delivery request approved"))
+					.onFailure(v -> logger.info("Track delivery request approval failed"));
+		} catch (final Exception e) {
+            final JsonObject evTrackingDeliveryRejected = new JsonObject();
+			evTrackingDeliveryRejected.put("requestId", requestId);
+			if (e instanceof DeliveryNotFoundException) {
+				evTrackingDeliveryRejected.put("error", e.getMessage());
+			} else {
+				evTrackingDeliveryRejected.put("error", "tracking-error");
 			}
-		});
+			deliveryTrackingRequestsRejected.postEvent(evTrackingDeliveryRejected)
+					.onSuccess(v -> logger.info("Track delivery request rejected"))
+					.onFailure(v -> logger.info("Track delivery request reject failed"));
+        }
 	}
 
 	protected void stopTrackingDelivery(final RoutingContext context) {
@@ -285,6 +307,19 @@ public class DeliveryServiceController extends VerticleBase  {
 				});
 			}
 		});
+	}
+
+	private String replaceWithId(final String channelName, final String id) {
+		return channelName.replace("{id}", id);
+	}
+
+	private void postCreateDeliveryRequestRejected(final String requestId, final String message) {
+		final JsonObject createDeliveryRequestRejected = new JsonObject();
+		createDeliveryRequestRejected.put("requestId", requestId);
+		createDeliveryRequestRejected.put("error", message);
+		this.createDeliveryRequestsRejected.postEvent(createDeliveryRequestRejected)
+				.onSuccess(v -> logger.info("Create delivery request rejected"))
+				.onFailure(v -> logger.info("Create delivery request reject failed"));
 	}
 	
 	/* Aux methods */
