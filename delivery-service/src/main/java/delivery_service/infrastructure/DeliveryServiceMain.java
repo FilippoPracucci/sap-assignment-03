@@ -14,8 +14,9 @@ public class DeliveryServiceMain {
 
 	private static final String DELIVERY_EVENT_STORE_FILE_NAME = "delivery_event_store.json";
 
-	static final int DELIVERY_SERVICE_PORT = 9002;
-	static final int PROMETHEUS_SERVER_PORT = 9400;
+	//static final int DELIVERY_SERVICE_PORT = 9002;
+	private static final String EV_CHANNELS_LOCATION = "broker:9092";
+	private static final int PROMETHEUS_SERVER_PORT = 9400;
 
 	public static void main(String[] args) {
 		final var deliveryService = new DeliveryServiceImpl();
@@ -25,7 +26,7 @@ public class DeliveryServiceMain {
 		} catch (final ObservabilityMetricServerException ex) {
 			Logger.getLogger("[DeliveryServiceMain]").info("Observability metric server failed to start");
 		}
-		Vertx.vertx().deployVerticle(new DeliveryServiceController(deliveryService, DELIVERY_SERVICE_PORT));
+		Vertx.vertx().deployVerticle(new DeliveryServiceController(deliveryService, EV_CHANNELS_LOCATION));
 	}
 
 }

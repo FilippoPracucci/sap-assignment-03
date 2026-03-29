@@ -10,26 +10,29 @@ import io.vertx.core.Vertx;
 
 public class LobbyServiceMain {
 
-	static final int LOBBY_SERVICE_PORT = 9001;
+	private static final int LOBBY_SERVICE_PORT = 9001;
 
 	/* addresses to be used when using a manual deployment */
 	/*static final String ACCOUNT_SERVICE_URI = "http://localhost:9000";
 	static final String DELIVERY_SERVICE_URI = "http://localhost:9002";*/
 
 	/* addresses to be used when deploying with Docker */
-	static final String ACCOUNT_SERVICE_URI = "http://account-service:9000";
-	static final String DELIVERY_SERVICE_URI = "http://delivery-service:9002";
+	private static final String ACCOUNT_SERVICE_URI = "http://account-service:9000";
+	//static final String DELIVERY_SERVICE_URI = "http://delivery-service:9002";
+	private static final String EV_CHANNELS_LOCATION = "broker:9092";
 
 	public static void main(String[] args) {
-		
+
+		final Vertx vertx = Vertx.vertx();
+
 		final var lobby = new LobbyServiceImpl();
 		final AccountService accountService =  new AccountServiceProxy(ACCOUNT_SERVICE_URI);
-		final DeliveryService deliveryService =  new DeliveryServiceProxy(DELIVERY_SERVICE_URI);
+		final DeliveryService deliveryService =  new DeliveryServiceProxy(vertx, EV_CHANNELS_LOCATION);
 
 		lobby.bindAccountService(accountService);
 		lobby.bindDeliveryService(deliveryService);
-		
-		Vertx.vertx().deployVerticle(new LobbyServiceController(lobby, LOBBY_SERVICE_PORT));
+
+		vertx.deployVerticle(new LobbyServiceController(lobby, LOBBY_SERVICE_PORT));
 	}
 
 }

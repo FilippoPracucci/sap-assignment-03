@@ -89,7 +89,6 @@ public class DeliveryServiceController extends VerticleBase  {
 	 */
 	protected void createNewDelivery(final JsonObject createDeliveryEvent) {
 		logger.info("CreateNewDelivery request");
-		final String deliveryId = createDeliveryEvent.getString("deliveryId");
 		final String requestId = createDeliveryEvent.getString("requestId");
 		try {
 			final Optional<Calendar> expectedShippingMoment = DeliveryJsonConverter
@@ -104,12 +103,12 @@ public class DeliveryServiceController extends VerticleBase  {
 			) {
 				this.postCreateDeliveryRequestRejected(requestId, "shipping-moment-too-far");
 			} else {
-				this.deliveryService.createNewDelivery(
+				final String deliveryId = this.deliveryService.createNewDelivery(
 						createDeliveryEvent.getNumber("weight").doubleValue(),
 						DeliveryJsonConverter.getAddress(createDeliveryEvent, "startingPlace"),
 						DeliveryJsonConverter.getAddress(createDeliveryEvent, "destinationPlace"),
 						expectedShippingMoment
-				);
+				).id();
 				final JsonObject evDeliveryCreated = new JsonObject();
 				evDeliveryCreated.put("deliveryId", deliveryId);
 				this.newDeliveryCreated.postEvent(evDeliveryCreated)
