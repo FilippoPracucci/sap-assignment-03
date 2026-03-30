@@ -55,49 +55,6 @@ public class DeliveryServiceProxy implements DeliveryService {
         createDeliveryRequestsRejected.init(this::onCreateDeliveryRequestRejected);
     }
 
-    private void onCreateDeliveryRequestApproved(final JsonObject event, final String evChannelsLocation) {
-        logger.info("onCreateDeliveryRequestApproved");
-        final String deliveryId = event.getString("deliveryId");
-        logger.info("Received: " + deliveryId);
-        final String requestId = event.getString("requestId");
-        this.deliveryIds.get(requestId).complete(new DeliveryId(deliveryId));
-        this.deliveryTrackingRequests.put(
-                deliveryId,
-                new OutputEventChannel(vertx, DELIVERY_TRACKING_REQUESTS_EVC.replace("{id}", deliveryId),
-                        evChannelsLocation)
-        );
-        new InputEventChannel(vertx, DELIVERY_TRACKING_REQUESTS_APPROVED_EVC.replace("{id}", deliveryId),
-                evChannelsLocation).init(this::onDeliveryTrackingRequestsApproved);
-        new InputEventChannel(vertx, DELIVERY_TRACKING_REQUESTS_REJECTED_EVC.replace("{id}", deliveryId),
-                evChannelsLocation).init(this::onDeliveryTrackingRequestsRejected);
-    }
-
-    private void onCreateDeliveryRequestRejected(final JsonObject event) {
-        logger.info("onCreateDeliveryRequestRejected");
-        final String requestId = event.getString("requestId");
-        final String error = event.getString("error");
-        logger.severe(error);
-        this.deliveryIds.get(requestId).fail(new CreateDeliveryFailedException(
-                error.contains("shipping-moment") ? ("Invalid shipping time: " + error) : error
-        ));
-    }
-
-    private void onDeliveryTrackingRequestsApproved(final JsonObject event) {
-        logger.info("onDeliveryTrackingRequestsApproved");
-        final String trackingSessionId = event.getString("trackingSessionId");
-        logger.info("Received: " + trackingSessionId);
-        final String requestId = event.getString("requestId");
-        this.trackingSessionIds.get(requestId).complete(trackingSessionId);
-    }
-
-    private void onDeliveryTrackingRequestsRejected(final JsonObject event) {
-        logger.info("onDeliveryTrackingRequestsRejected");
-        final String requestId = event.getString("requestId");
-        final String error = event.getString("error");
-        logger.severe(error);
-        this.trackingSessionIds.get(requestId).fail(new TrackDeliveryFailedException(error));
-    }
-
     @Override
     public DeliveryId createNewDelivery(final double weight, final Address startingPlace,
                                         final Address destinationPlace, final Optional<Calendar> expectedShippingMoment)
@@ -131,8 +88,36 @@ public class DeliveryServiceProxy implements DeliveryService {
         }
     }
 
+    private void onCreateDeliveryRequestApproved(final JsonObject event, final String evChannelsLocation) {
+        logger.info("onCreateDeliveryRequestApproved");
+        final String deliveryId = event.getString("deliveryId");
+        logger.info("Received: " + deliveryId);
+        final String requestId = event.getString("requestId");
+        this.deliveryIds.get(requestId).complete(new DeliveryId(deliveryId));
+        this.deliveryTrackingRequests.put(
+                deliveryId,
+                new OutputEventChannel(vertx, DELIVERY_TRACKING_REQUESTS_EVC.replace("{id}", deliveryId),
+                        evChannelsLocation)
+        );
+        new InputEventChannel(vertx, DELIVERY_TRACKING_REQUESTS_APPROVED_EVC.replace("{id}", deliveryId),
+                evChannelsLocation).init(this::onDeliveryTrackingRequestsApproved);
+        new InputEventChannel(vertx, DELIVERY_TRACKING_REQUESTS_REJECTED_EVC.replace("{id}", deliveryId),
+                evChannelsLocation).init(this::onDeliveryTrackingRequestsRejected);
+    }
+
+    private void onCreateDeliveryRequestRejected(final JsonObject event) {
+        logger.info("onCreateDeliveryRequestRejected");
+        final String requestId = event.getString("requestId");
+        final String error = event.getString("error");
+        logger.severe(error);
+        this.deliveryIds.get(requestId).fail(new CreateDeliveryFailedException(
+                error.contains("shipping-moment") ? ("Invalid shipping time: " + error) : error
+        ));
+    }
+
     @Override
-    public String trackDelivery(final DeliveryId deliveryId) throws TrackDeliveryFailedException, ServiceNotAvailableException {
+    public String trackDelivery(final DeliveryId deliveryId) throws TrackDeliveryFailedException,
+            ServiceNotAvailableException {
         this.count++;
         final String requestId = "lobby-" + this.count;
         final JsonObject trackDeliveryEvent = new JsonObject();
@@ -160,5 +145,21 @@ public class DeliveryServiceProxy implements DeliveryService {
             this.trackingSessionIds.remove(requestId);
             throw new ServiceNotAvailableException();
         }
+    }
+
+    private void onDeliveryTrackingRequestsApproved(final JsonObject event) {
+        logger.info("onDeliveryTrackingRequestsApproved");
+        final String trackingSessionId = event.getString("trackingSessionId");
+        logger.info("Received: " + trackingSessionId);
+        final String requestId = event.getString("requestId");
+        this.trackingSessionIds.get(requestId).complete(trackingSessionId);
+    }
+
+    private void onDeliveryTrackingRequestsRejected(final JsonObject event) {
+        logger.info("onDeliveryTrackingRequestsRejected");
+        final String requestId = event.getString("requestId");
+        final String error = event.getString("error");
+        logger.severe(error);
+        this.trackingSessionIds.get(requestId).fail(new TrackDeliveryFailedException(error));
     }
 }

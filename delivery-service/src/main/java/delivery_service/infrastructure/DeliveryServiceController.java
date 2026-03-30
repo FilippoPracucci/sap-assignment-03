@@ -27,33 +27,28 @@ public class DeliveryServiceController extends VerticleBase  {
 	private final String evChannelsLocation;
 	static Logger logger = Logger.getLogger("[Delivery Service Controller]");
 
-	static final String API_VERSION = "v1";
-	static final String DELIVERIES_RESOURCE_PATH = "/api/" + API_VERSION + "/deliveries";
-	static final String DELIVERY_RESOURCE_PATH =  DELIVERIES_RESOURCE_PATH +   "/:deliveryId";
-	static final String TRACK_RESOURCE_PATH =  DELIVERY_RESOURCE_PATH +   "/track";
-	static final String TRACKING_RESOURCE_PATH = DELIVERY_RESOURCE_PATH + "/:trackingSessionId";
-	static final String STOP_TRACKING_RESOURCE_PATH = TRACKING_RESOURCE_PATH + "/stop";
-
 	/* Health check endpoint */
-	static final String HEALTH_CHECK_ENDPOINT = "/api/" + API_VERSION + "/health";
+	static final String HEALTH_CHECK_ENDPOINT = "/api/v1/health";
 
 	/* Static channels */
 	static final String CREATE_DELIVERY_REQUESTS_EVC = "create-delivery-requests";
 	static final String CREATE_DELIVERY_REQUESTS_APPROVED_EVC = "create-delivery-requests-approved";
 	static final String CREATE_DELIVERY_REQUESTS_REJECTED_EVC = "create-delivery-requests-rejected";
 	static final String NEW_DELIVERY_CREATED_EVC = "new-delivery-created";
+	static final String STOP_DELIVERY_TRACKING_REQUESTS_EVC = "stop-tracking-requests";
 
 	/* Dynamic channels */
 	static final String DELIVERY_TRACKING_REQUESTS_EVC = "delivery-{id}-tracking-requests";
 	static final String DELIVERY_TRACKING_REQUESTS_APPROVED_EVC = "delivery-{id}-tracking-requests-approved";
 	static final String DELIVERY_TRACKING_REQUESTS_REJECTED_EVC = "delivery-{id}-tracking-requests-rejected";
+	static final String STOP_DELIVERY_TRACKING_REQUESTS_APPROVED_EVC = "stop-tracking-{id}-requests-approved";
+	static final String STOP_DELIVERY_TRACKING_REQUESTS_REJECTED_EVC = "stop-tracking-{id}-requests-rejected";
 	static final String TRACKING_DELIVERY_EVC = "tracking-delivery-{id}-events";
 	
 	/* Ref. to the application layer */
 	private final DeliveryService deliveryService;
 
-	private InputEventChannel createDeliveryRequests;
-	private OutputEventChannel createDeliveryRequestsApproved;
+    private OutputEventChannel createDeliveryRequestsApproved;
 	private OutputEventChannel createDeliveryRequestsRejected;
 	private OutputEventChannel newDeliveryCreated;
 
@@ -64,14 +59,16 @@ public class DeliveryServiceController extends VerticleBase  {
 
 	public Future<?> start() {
 		logger.info("Delivery Service initializing...");
-		this.createDeliveryRequests = new InputEventChannel(vertx, CREATE_DELIVERY_REQUESTS_EVC,
-				this.evChannelsLocation);
+        final InputEventChannel createDeliveryRequests = new InputEventChannel(vertx, CREATE_DELIVERY_REQUESTS_EVC,
+                this.evChannelsLocation);
 		this.createDeliveryRequestsApproved = new OutputEventChannel(vertx, CREATE_DELIVERY_REQUESTS_APPROVED_EVC,
 				this.evChannelsLocation);
 		this.createDeliveryRequestsRejected = new OutputEventChannel(vertx, CREATE_DELIVERY_REQUESTS_REJECTED_EVC,
 				this.evChannelsLocation);
 		this.newDeliveryCreated = new OutputEventChannel(vertx, NEW_DELIVERY_CREATED_EVC, evChannelsLocation);
-		this.createDeliveryRequests.init(this::createNewDelivery);
+		new InputEventChannel(this.vertx, STOP_DELIVERY_TRACKING_REQUESTS_EVC, this.evChannelsLocation)
+				.init(this::stopTrackingDelivery);
+		createDeliveryRequests.init(this::createNewDelivery);
 		return Promise.promise().future();
 	}
 
@@ -187,7 +184,9 @@ public class DeliveryServiceController extends VerticleBase  {
 			evTrackingDeliveryApproved.put("trackingSessionId", trackingSession.getId());
 			evTrackingDeliveryApproved.put("requestId", requestId);
 			deliveryTrackingRequestsApproved.postEvent(evTrackingDeliveryApproved)
-					.onSuccess(v -> logger.info("Track delivery request approved"))
+					.onSuccess(v -> {
+						logger.info("Track delivery request approved");
+					})
 					.onFailure(v -> logger.info("Track delivery request approval failed"));
 		} catch (final Exception e) {
             final JsonObject evTrackingDeliveryRejected = new JsonObject();
@@ -203,25 +202,42 @@ public class DeliveryServiceController extends VerticleBase  {
         }
 	}
 
-	protected void stopTrackingDelivery(final RoutingContext context) {
-		logger.info("Stop tracking delivery request - " + context.currentRoute().getPath());
-		context.request().endHandler(h -> {
-			final DeliveryId deliveryId = new DeliveryId(context.pathParam("deliveryId"));
-			final String trackingSessionId = context.pathParam("trackingSessionId");
-			logger.info("Stop tracking delivery " + deliveryId.id());
-			var reply = new JsonObject();
-			try {
-				this.deliveryService.stopTrackingDelivery(deliveryId, trackingSessionId);
-				reply.put("result", "ok");
-				sendReply(context.response(), reply);
-			} catch (final DeliveryNotFoundException | TrackingSessionNotFoundException ex) {
-				reply.put("result", "error");
-				reply.put("error", ex.getMessage());
-				sendReply(context.response(), reply);
-			} catch (Exception ex1) {
-				sendError(context.response());
+	protected void stopTrackingDelivery(final JsonObject stopTrackingDeliveryEvent) {
+		logger.info("Stop tracking delivery request");
+		final  String requestId = stopTrackingDeliveryEvent.getString("requestId");
+		final String deliveryId = stopTrackingDeliveryEvent.getString("deliveryId");
+		final String trackingSessionId = stopTrackingDeliveryEvent.getString("trackingSessionId");
+		final OutputEventChannel stopTrackingDeliveryRequestsApproved = new OutputEventChannel(
+				this.vertx,
+				replaceWithId(STOP_DELIVERY_TRACKING_REQUESTS_APPROVED_EVC, trackingSessionId),
+				this.evChannelsLocation
+		);
+		final OutputEventChannel stopTrackingDeliveryRequestsRejected = new OutputEventChannel(
+				this.vertx,
+				replaceWithId(STOP_DELIVERY_TRACKING_REQUESTS_REJECTED_EVC, trackingSessionId),
+				this.evChannelsLocation
+		);
+		try {
+			this.deliveryService.stopTrackingDelivery(new DeliveryId(deliveryId), trackingSessionId);
+			final JsonObject evTrackingDeliveryApproved = new JsonObject();
+			evTrackingDeliveryApproved.put("requestId", requestId);
+			stopTrackingDeliveryRequestsApproved.postEvent(evTrackingDeliveryApproved)
+							.onSuccess(v -> logger.info("Stop tracking delivery request approved"))
+							.onFailure(v -> logger.info("Stop tracking delivery request approval failed"));
+		} catch (final Exception e) {
+			final JsonObject evTrackingDeliveryRejected = new JsonObject();
+			evTrackingDeliveryRejected.put("requestId", requestId);
+			if (e instanceof DeliveryNotFoundException) {
+				evTrackingDeliveryRejected.put("error", e.getMessage());
+			} else if (e instanceof TrackingSessionNotFoundException) {
+				evTrackingDeliveryRejected.put("error", "tracking-session-not-found");
+			} else {
+				evTrackingDeliveryRejected.put("error", "stop-tracking-error");
 			}
-		});
+			stopTrackingDeliveryRequestsRejected.postEvent(evTrackingDeliveryRejected)
+					.onSuccess(v -> logger.info("Stop tracking delivery request rejected"))
+					.onFailure(v -> logger.info("Stop tracking delivery request reject failed"));
+		}
 	}
 	
 	/**

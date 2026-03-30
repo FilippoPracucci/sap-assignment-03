@@ -29,16 +29,16 @@ public class APIGatewayMain {
     static final String LOBBY_SERVICE_ADDRESS = "http://lobby-service:9001";
     static final String DELIVERY_SERVICE_ADDRESS = "http://delivery-service:9002";
 
-    static final String DELIVERY_SERVICE_WS_ADDRESS = "delivery-service";
-    static final int DELIVERY_SERVICE_WS_PORT = 9002;
+    private static final String EV_CHANNELS_LOCATION = "broker:9092";
 
     static final int METRICS_SERVER_EXPOSED_PORT = 9401;
 
     public static void main(String[] args) {
+        final Vertx vertx = Vertx.vertx();
+
         final AccountService accountService = new AccountServiceProxy(ACCOUNT_SERVICE_ADDRESS);
         final LobbyService lobbyService = new LobbyServiceProxy(LOBBY_SERVICE_ADDRESS);
-        final DeliveryServiceVertx deliveryService = new DeliveryServiceProxy(DELIVERY_SERVICE_ADDRESS,
-                DELIVERY_SERVICE_WS_ADDRESS, DELIVERY_SERVICE_WS_PORT);
+        final DeliveryServiceVertx deliveryService = new DeliveryServiceProxy(vertx, EV_CHANNELS_LOCATION);
 
         var server = new APIGatewayController(accountService, lobbyService, deliveryService, BACKEND_PORT);
         try {
