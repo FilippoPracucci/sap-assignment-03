@@ -54,6 +54,16 @@ public class DeliveryJsonConverter {
         return obj;
     }
 
+    public static JsonObject toJson(final DeliveryStatus deliveryStatus) throws DeliveryNotShippedYetException {
+        final JsonObject obj = new JsonObject();
+        obj.put("deliveryId", deliveryStatus.getId().id());
+        obj.put("deliveryState", deliveryStatus.getState().getLabel());
+        if (deliveryStatus.isTimeLeftAvailable()) {
+            obj.put("timeLeft", deliveryStatus.getTimeLeft().days() + " days left");
+        }
+        return obj;
+    }
+
     private static JsonObject toJson(final String key, final DeliveryTime deliveryTime) {
         return new JsonObject(Map.of(key, new JsonObject(Map.of(
                 "days", deliveryTime.days(),

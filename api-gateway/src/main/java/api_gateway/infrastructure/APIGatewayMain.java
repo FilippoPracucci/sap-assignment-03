@@ -46,7 +46,7 @@ public class APIGatewayMain {
         } catch (final ObservabilityMetricServerException e) {
             Logger.getLogger("[APIGatewayMain]").info("Observability metric server failed to start");
         }
-        Vertx.vertx().deployVerticle(server);
+        vertx.deployVerticle(server);
     }
 }
 

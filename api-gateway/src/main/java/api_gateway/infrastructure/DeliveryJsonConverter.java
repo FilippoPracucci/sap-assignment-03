@@ -1,7 +1,6 @@
 package api_gateway.infrastructure;
 
-import api_gateway.domain.Address;
-import api_gateway.domain.DeliveryDetail;
+import api_gateway.domain.*;
 import io.vertx.core.json.JsonObject;
 
 import java.util.Calendar;
@@ -73,5 +72,27 @@ public class DeliveryJsonConverter {
                 "minutes", deliveryDetail.expectedShippingMoment().get(Calendar.MINUTE))
         ));
         return obj;
+    }
+
+    public static DeliveryDetail fromJsonToDeliveryDetail(final JsonObject json) {
+        return new DeliveryDetailImpl(
+                new DeliveryId(json.getString("deliveryId")),
+                json.getDouble("weight"),
+                getAddress(json, "startingPlace"),
+                getAddress(json, "destinationPlace"),
+                getExpectedShippingMoment(json).orElseThrow(IllegalStateException::new)
+        );
+    }
+
+    public static DeliveryStatus fromJsonToDeliveryStatus(final JsonObject json) {
+        return new DeliveryStatusImpl(
+                new DeliveryId(json.getString("deliveryId")),
+                DeliveryState.valueOfLabel(json.getString("deliveryState")),
+                json.containsKey("timeLeft")
+                        ? Optional.of(
+                                new DeliveryTime(Integer.parseInt(json.getString("timeLeft").split(" ")[0]), 0)
+                        )
+                        : Optional.empty()
+        );
     }
 }
