@@ -18,7 +18,6 @@ public class LobbyServiceMain {
 
 	/* addresses to be used when deploying with Docker */
 	private static final String ACCOUNT_SERVICE_URI = "http://account-service:9000";
-	//static final String DELIVERY_SERVICE_URI = "http://delivery-service:9002";
 	private static final String EV_CHANNELS_LOCATION = "broker:9092";
 
 	public static void main(String[] args) {

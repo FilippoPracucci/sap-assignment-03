@@ -27,9 +27,6 @@ public class DeliveryServiceController extends VerticleBase  {
 	private final String evChannelsLocation;
 	private static Logger logger = Logger.getLogger("[Delivery Service Controller]");
 
-	/* Health check endpoint */
-	private static final String HEALTH_CHECK_ENDPOINT = "/api/v1/health";
-
 	/* Static channels */
 	private static final String CREATE_DELIVERY_REQUESTS_EVC = "create-delivery-requests";
 	private static final String CREATE_DELIVERY_REQUESTS_APPROVED_EVC = "create-delivery-requests-approved";
@@ -81,13 +78,6 @@ public class DeliveryServiceController extends VerticleBase  {
 		new InputEventChannel(this.vertx, GET_DELIVERY_STATUS_REQUESTS_EVC, this.evChannelsLocation)
 				.init(this::getDeliveryStatus);
 		return Promise.promise().future();
-	}
-
-	protected void healthCheckHandler(final RoutingContext context) {
-		logger.info("Health check request " + context.currentRoute().getPath());
-		final JsonObject reply = new JsonObject();
-		reply.put("status", "UP");
-		sendReply(context.response(), reply);
 	}
 
 	/**

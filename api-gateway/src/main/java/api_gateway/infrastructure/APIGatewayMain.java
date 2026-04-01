@@ -27,7 +27,6 @@ public class APIGatewayMain {
 
     static final String ACCOUNT_SERVICE_ADDRESS = "http://account-service:9000";
     static final String LOBBY_SERVICE_ADDRESS = "http://lobby-service:9001";
-    static final String DELIVERY_SERVICE_ADDRESS = "http://delivery-service:9002";
 
     private static final String EV_CHANNELS_LOCATION = "broker:9092";
 
