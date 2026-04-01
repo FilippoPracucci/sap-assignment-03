@@ -202,8 +202,15 @@ public class DeliveryServiceController extends VerticleBase  {
 		final String requestId = trackDeliveryEvent.getString("requestId");
 		final String deliveryId = trackDeliveryEvent.getString("deliveryId");
 		try {
-			final String trackingSessionId = this.deliveryService.trackDelivery(new DeliveryId(deliveryId),
-					new KafkaTrackingSessionEventObserver()).getId();
+			final TrackingSession trackingSession = this.deliveryService.trackDelivery(
+					new DeliveryId(deliveryId),
+					new KafkaTrackingSessionEventObserver(
+							this.vertx,
+							this.evChannelsLocation,
+							DELIVERY_TRACKING_INTERNAL_EVC
+					)
+			);
+			final String trackingSessionId = trackingSession.getId();
 			final JsonObject evTrackingDeliveryApproved = new JsonObject();
 			evTrackingDeliveryApproved.put("trackingSessionId", trackingSessionId);
 			evTrackingDeliveryApproved.put("requestId", requestId);
@@ -215,6 +222,7 @@ public class DeliveryServiceController extends VerticleBase  {
 								replaceWithId(DELIVERY_TRACKING_INTERNAL_EVC, trackingSessionId),
 								this.evChannelsLocation
 						).init(e -> handleDeliveryTrackingEvents(e, trackingSessionId));
+						trackingSession.getTrackingSessionEventNotifier().enableEventNotification(trackingSessionId);
 						this.deliveryTrackingExternalChannels.put(
 								trackingSessionId,
 								new OutputEventChannel(
@@ -333,12 +341,6 @@ public class DeliveryServiceController extends VerticleBase  {
 				.postEvent(deliveryEvent)
 				.onSuccess(v -> logger.info("Post delivery tracking event succeeded"))
 				.onFailure(v -> logger.info("Post delivery tracking event failed"));
-		/*try {
-			final TrackingSession trackingSession = this.deliveryService.getTrackingSession(trackingSessionId);
-			trackingSession.getTrackingSessionEventNotifier().enableEventNotification(trackingSessionId);
-		} catch (final TrackingSessionNotFoundException e) {
-			throw new RuntimeException(e);
-		}*/
 	}
 
 	private String replaceWithId(final String channelName, final String id) {

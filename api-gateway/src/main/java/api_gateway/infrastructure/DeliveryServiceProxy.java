@@ -238,7 +238,10 @@ public class DeliveryServiceProxy implements DeliveryServiceVertx {
 
     @Override
     public void createAnEventChannel(final String trackingSessionId, final Vertx vertx) {
-        new InputEventChannel(this.vertx, DELIVERY_TRACKING_EXTERNAL_EVC, this.evChannelsLocation)
-                .init(e -> vertx.eventBus().publish(trackingSessionId, e));
+        new InputEventChannel(
+                this.vertx,
+                DELIVERY_TRACKING_EXTERNAL_EVC.replace("{id}", trackingSessionId),
+                this.evChannelsLocation
+        ).init(e -> vertx.eventBus().publish(trackingSessionId, e));
     }
 }
