@@ -20,8 +20,13 @@ public class DeliveryStatusImpl implements DeliveryStatus {
     }
 
     @Override
-    public Optional<DeliveryTime> getTimeLeft() {
-        return this.timeLeft;
+    public DeliveryTime getTimeLeft() throws DeliveryNotShippedYetException {
+        return this.timeLeft.orElseThrow(DeliveryNotShippedYetException::new);
+    }
+
+    @Override
+    public boolean isTimeLeftAvailable() {
+        return this.timeLeft.isPresent();
     }
 
     @Override

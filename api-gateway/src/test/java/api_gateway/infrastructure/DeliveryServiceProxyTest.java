@@ -18,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 public class DeliveryServiceProxyTest {
 
     private final static Logger logger = Logger.getLogger("[DeliveryServiceProxyTest]");
-    private static final String DELIVERY_SERVICE_ADDRESS = "http://localhost";
-    private static final int DELIVERY_SERVICE_PORT = 9002;
+
+    private static final String EV_CHANNELS_LOCATION = "broker:9092";
 
     private DeliveryServiceController deliveryServiceController;
     private DeliveryServiceProxy proxy;
@@ -30,7 +30,7 @@ public class DeliveryServiceProxyTest {
         final Synchronizer sync = new Synchronizer();
         final DeliveryServiceVertx deliveryService = new DeliveryServiceMock();
         this.vertx = Vertx.vertx();
-        this.deliveryServiceController = new DeliveryServiceController(deliveryService, DELIVERY_SERVICE_PORT);
+        this.deliveryServiceController = new DeliveryServiceController(deliveryService, EV_CHANNELS_LOCATION);
         vertx.deployVerticle(this.deliveryServiceController)
                 .onSuccess((res) -> sync.notifySync());
         try {
@@ -40,11 +40,7 @@ public class DeliveryServiceProxyTest {
             logger.info("sync failed.");
             ex.printStackTrace();
         }
-        this.proxy = new DeliveryServiceProxy(
-                DELIVERY_SERVICE_ADDRESS + ":" + DELIVERY_SERVICE_PORT,
-                "delivery-service",
-                DELIVERY_SERVICE_PORT
-        );
+        this.proxy = new DeliveryServiceProxy(Vertx.vertx(), EV_CHANNELS_LOCATION);
         logger.info("setup completed.");
     }
 

@@ -8,5 +8,7 @@ public interface DeliveryStatus extends Entity<DeliveryId> {
 
     DeliveryState getState();
 
-    Optional<DeliveryTime> getTimeLeft();
+    DeliveryTime getTimeLeft() throws DeliveryNotShippedYetException;
+
+    boolean isTimeLeftAvailable();
 }

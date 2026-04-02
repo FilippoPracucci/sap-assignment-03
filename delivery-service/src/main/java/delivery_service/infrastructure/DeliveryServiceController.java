@@ -3,11 +3,8 @@ package delivery_service.infrastructure;
 import delivery_service.application.*;
 import delivery_service.domain.*;
 import io.vertx.core.Future;
-import io.vertx.core.Promise;
 import io.vertx.core.VerticleBase;
-import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.RoutingContext;
 import kafka.InputEventChannel;
 import kafka.OutputEventChannel;
 
@@ -25,7 +22,7 @@ import java.util.logging.Logger;
 public class DeliveryServiceController extends VerticleBase  {
 
 	private final String evChannelsLocation;
-	private static Logger logger = Logger.getLogger("[Delivery Service Controller]");
+	private static final Logger logger = Logger.getLogger("[Delivery Service Controller]");
 
 	/* Static channels */
 	private static final String CREATE_DELIVERY_REQUESTS_EVC = "create-delivery-requests";
@@ -77,7 +74,7 @@ public class DeliveryServiceController extends VerticleBase  {
 				.init(this::getDeliveryDetail);
 		new InputEventChannel(this.vertx, GET_DELIVERY_STATUS_REQUESTS_EVC, this.evChannelsLocation)
 				.init(this::getDeliveryStatus);
-		return Promise.promise().future();
+		return Future.succeededFuture();
 	}
 
 	/**
@@ -345,19 +342,4 @@ public class DeliveryServiceController extends VerticleBase  {
 				.onSuccess(v -> logger.info("Create delivery request rejected"))
 				.onFailure(v -> logger.info("Create delivery request reject failed"));
 	}
-	
-	/* Aux methods */
-
-	private void sendReply(final HttpServerResponse response, final JsonObject reply) {
-		response.putHeader("content-type", "application/json");
-		response.end(reply.toString());
-	}
-	
-	private void sendError(final HttpServerResponse response) {
-		response.setStatusCode(500);
-		response.putHeader("content-type", "application/json");
-		response.end();
-	}
-
-
 }

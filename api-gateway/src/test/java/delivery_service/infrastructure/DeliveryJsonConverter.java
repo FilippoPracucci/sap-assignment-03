@@ -1,6 +1,8 @@
 package delivery_service.infrastructure;
 
 import api_gateway.domain.DeliveryDetail;
+import api_gateway.domain.DeliveryNotShippedYetException;
+import api_gateway.domain.DeliveryStatus;
 import io.vertx.core.json.JsonObject;
 
 import java.util.Calendar;
@@ -27,6 +29,16 @@ public class DeliveryJsonConverter {
                 "hours", deliveryDetail.expectedShippingMoment().get(Calendar.HOUR_OF_DAY),
                 "minutes", deliveryDetail.expectedShippingMoment().get(Calendar.MINUTE))
         ));
+        return obj;
+    }
+
+    public static JsonObject toJson(final DeliveryStatus deliveryStatus) throws DeliveryNotShippedYetException {
+        final JsonObject obj = new JsonObject();
+        obj.put("deliveryId", deliveryStatus.getId().id());
+        obj.put("deliveryState", deliveryStatus.getState().getLabel());
+        if (deliveryStatus.isTimeLeftAvailable()) {
+            obj.put("timeLeft", deliveryStatus.getTimeLeft().days() + " days left");
+        }
         return obj;
     }
 }

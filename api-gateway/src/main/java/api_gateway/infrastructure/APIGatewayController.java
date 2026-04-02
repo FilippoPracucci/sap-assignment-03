@@ -10,6 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import api_gateway.domain.DeliveryId;
+import api_gateway.domain.DeliveryNotShippedYetException;
 import api_gateway.domain.UserId;
 import io.vertx.core.Future;
 import io.vertx.core.VerticleBase;
@@ -319,9 +320,9 @@ public class APIGatewayController extends VerticleBase  {
 				final JsonObject deliveryJson = new JsonObject();
 				deliveryJson.put("deliveryId", deliveryId.id());
 				deliveryJson.put("deliveryState", deliveryStatus.getState().getLabel());
-				if (deliveryStatus.getTimeLeft().isPresent()) {
-					deliveryJson.put("timeLeft", deliveryStatus.getTimeLeft().get().days() + " days left");
-				}
+				try {
+					deliveryJson.put("timeLeft", deliveryStatus.getTimeLeft().days() + " days left");
+				} catch (final DeliveryNotShippedYetException ignored) {}
 				reply.put("deliveryStatus", deliveryJson);
 				sendReply(ctx.response(), reply);
 			}).onFailure(f -> {
