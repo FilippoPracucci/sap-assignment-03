@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 @Adapter
@@ -125,6 +126,7 @@ public class DeliveryServiceProxy implements DeliveryService {
         trackDeliveryEvent.put("requestId", requestId);
         try {
             final Promise<String> promise = Promise.promise();
+            this.waitCreateDeliveryCompleted(deliveryId);
             this.deliveryTrackingRequests.get(deliveryId.id()).postEvent(trackDeliveryEvent);
             this.trackingSessionIds.put(requestId, promise);
             return promise.future()
@@ -144,6 +146,17 @@ public class DeliveryServiceProxy implements DeliveryService {
         } catch (final Exception e) {
             this.trackingSessionIds.remove(requestId);
             throw new ServiceNotAvailableException();
+        }
+    }
+
+    private void waitCreateDeliveryCompleted(final DeliveryId deliveryId) throws TimeoutException, InterruptedException {
+        long timer = 0L;
+        while (this.deliveryTrackingRequests.get(deliveryId.id()) == null && timer < 10_000) {
+            Thread.sleep(100);
+            timer += 100;
+        }
+        if (timer >= 10_000) {
+            throw new TimeoutException();
         }
     }
 

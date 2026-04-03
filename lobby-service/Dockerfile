@@ -4,4 +4,3 @@ COPY . /project/
 ENV TZ="Europe/Rome"
 RUN mvn clean package -DskipTests
 EXPOSE 9001
-CMD ["mvn", "exec:java", "-Dexec.mainClass=lobby_service.infrastructure.LobbyServiceMain"]

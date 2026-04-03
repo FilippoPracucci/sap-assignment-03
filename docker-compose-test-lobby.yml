@@ -39,65 +39,24 @@ services:
       - shipping_on_the_air_network
     ports:
       - "9000:9000"
-    expose: 
+    expose:
       - 9000
     restart: always
-  lobby-service:
+  lobby-service-test:
     build:
       context: ./lobby-service
     image: lobby-service
     container_name: lobby-service-01
-    command: mvn exec:java -Dexec.mainClass=lobby_service.infrastructure.LobbyServiceMain
+    depends_on:
+      - account-service
+      - kafka
+    command: mvn test
     networks:
       - shipping_on_the_air_network
     ports:
       - "9001:9001"
-    expose: 
+    expose:
       - 9001
-    restart: always
-  delivery-service:
-    build:
-      context: ./delivery-service
-    image: delivery-service
-    container_name: delivery-service-01
-    networks:
-      - shipping_on_the_air_network
-    ports:
-      - "9002:9002"
-      - "9400:9400"
-    expose:
-      - 9002
-      - 9400
-    restart: always
-  api-gateway:
-    build:
-      context: ./api-gateway
-    image: api-gateway
-    container_name: api-gateway-01
-    command: mvn exec:java -Dexec.mainClass=api_gateway.infrastructure.APIGatewayMain
-    networks:
-      - shipping_on_the_air_network
-    ports:
-      - "8080:8080"
-      - "9401:9401"
-    expose:
-      - 8080
-      - 9401
-    healthcheck:
-      test: curl --fail http://api-gateway:8080/api/v1/health || exit 1
-      interval: 1m30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    labels:
-        - "autoheal=true"
-    restart: always
-  autoheal:
-    image: willfarrell/autoheal:1.1.0
-    tty: true
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
   prometheus:
     image: prom/prometheus
     volumes:
