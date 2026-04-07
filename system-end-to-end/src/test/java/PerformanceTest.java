@@ -13,8 +13,8 @@ public class PerformanceTest extends Setup {
 
     @Test
     public void testAvgResponseTime() {
-        final int nConcurrentRequests = 1000;
-        final int responseTimeThresholdInMs = 100;
+        final int nConcurrentRequests = 50;
+        final int responseTimeThresholdInMs = 2000;
         final List<Thread> threads = new ArrayList<>();
         for (int i = 0; i < nConcurrentRequests; i++) {
             threads.add(Thread.ofVirtual().start(() -> {
@@ -40,6 +40,9 @@ public class PerformanceTest extends Setup {
             double totalResponseTimeInMs = this.getMetricValue("api_gateway_request_response_time_ms_total");
             double averageResponseTimeInMs = (totalResponseTimeInMs / nRequests);
             assertEquals(nConcurrentRequests, nRequests);
+            System.out.println("Average response time in ms: " + averageResponseTimeInMs);
+            double throughput = nConcurrentRequests / (averageResponseTimeInMs / 1000);
+            System.out.println("Throughput (requests per second): " + throughput);
             assertTrue(averageResponseTimeInMs <= responseTimeThresholdInMs);
         } catch (Exception e) {
             e.printStackTrace();

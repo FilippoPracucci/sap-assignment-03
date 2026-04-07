@@ -5,7 +5,7 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -13,6 +13,7 @@ import api_gateway.domain.DeliveryId;
 import api_gateway.domain.DeliveryNotShippedYetException;
 import api_gateway.domain.UserId;
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.VerticleBase;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.http.HttpMethod;
@@ -126,29 +127,35 @@ public class APIGatewayController extends VerticleBase  {
 	 */
 	protected void createNewAccount(final RoutingContext context) {
 		logger.info("create a new account");
-		this.handleRequest(ctx -> ctx.request().handler(buf -> {
-            JsonObject userInfo = buf.toJsonObject();
-            logger.info("Payload: " + userInfo);
-            var userName = userInfo.getString("userName");
-            var password = userInfo.getString("password");
-            var reply = new JsonObject();
-            this.vertx.executeBlocking(() -> this.accountService.registerUser(userName, password))
-                    .onSuccess((account) -> {
-						reply.put("result", "ok");
-						reply.put("accountId", account.getId().id());
-						reply.put("loginLink", LOGIN_RESOURCE_PATH.replace(":accountId", account.getId().id()));
-						reply.put("accountLink", ACCOUNT_RESOURCE_PATH.replace(":accountId", account.getId().id()));
-						sendReply(ctx.response(), reply);
-						this.notifyAccountCircuitStatus(false);
-                    }).onFailure((f) -> {
-						if (f instanceof ServiceNotAvailableException) {
-							this.notifyAccountCircuitStatus(((ServiceNotAvailableException) f).isCircuitOpen());
-						}
-						reply.put("result", "error");
-						reply.put("error", f.getMessage());
-						sendReply(ctx.response(), reply);
-                    });
-        }), context);
+		this.handleRequest(ctx -> {
+			final Promise<Void> promise = Promise.promise();
+			ctx.request().handler(buf -> {
+				JsonObject userInfo = buf.toJsonObject();
+				logger.info("Payload: " + userInfo);
+				var userName = userInfo.getString("userName");
+				var password = userInfo.getString("password");
+				var reply = new JsonObject();
+				this.vertx.executeBlocking(() -> this.accountService.registerUser(userName, password))
+						.onSuccess((account) -> {
+							reply.put("result", "ok");
+							reply.put("accountId", account.getId().id());
+							reply.put("loginLink", LOGIN_RESOURCE_PATH.replace(":accountId", account.getId().id()));
+							reply.put("accountLink", ACCOUNT_RESOURCE_PATH.replace(":accountId", account.getId().id()));
+							sendReply(ctx.response(), reply);
+							promise.complete();
+							this.notifyAccountCircuitStatus(false);
+						}).onFailure((f) -> {
+							if (f instanceof ServiceNotAvailableException) {
+								this.notifyAccountCircuitStatus(((ServiceNotAvailableException) f).isCircuitOpen());
+							}
+							reply.put("result", "error");
+							reply.put("error", f.getMessage());
+							sendReply(ctx.response(), reply);
+							promise.fail(f);
+						});
+			});
+			return promise.future();
+		}, context);
 	}
 
 	/**
@@ -160,6 +167,7 @@ public class APIGatewayController extends VerticleBase  {
 	protected void getAccountInfo(final RoutingContext context) {
 		logger.info("get account info");
 		this.handleRequest(ctx -> {
+			final Promise<Void> promise = Promise.promise();
 			var userId = ctx.pathParam("accountId");
 			var reply = new JsonObject();
 			this.vertx.executeBlocking(() -> this.accountService.getAccountInfo(new UserId(userId)))
@@ -171,6 +179,7 @@ public class APIGatewayController extends VerticleBase  {
 						accJson.put("whenCreated", account.getWhenCreated());
 						reply.put("accountInfo", accJson);
 						sendReply(ctx.response(), reply);
+						promise.complete();
 						this.notifyAccountCircuitStatus(false);
 					}).onFailure((f) -> {
 						if (f instanceof ServiceNotAvailableException) {
@@ -179,7 +188,9 @@ public class APIGatewayController extends VerticleBase  {
 						reply.put("result", "error");
 						reply.put("error", f.getMessage());
 						sendReply(ctx.response(), reply);
+						promise.fail(f);
 					});
+			return promise.future();
 		}, context);
 	}
 	
@@ -193,28 +204,34 @@ public class APIGatewayController extends VerticleBase  {
 	 */
 	protected void login(final RoutingContext context) {
 		logger.info("Login request");
-		this.handleRequest(ctx -> ctx.request().handler(buf -> {
-			JsonObject userInfo = buf.toJsonObject();
-			logger.info("Payload: " + userInfo);
-			String userId = ctx.pathParam("accountId");
-			String password = userInfo.getString("password");
-			var reply = new JsonObject();
-			this.vertx.executeBlocking(() -> this.lobbyService.login(new UserId(userId), password))
-					.onSuccess((userSessionId) -> {
-				reply.put("result", "ok");
-				var createPath = CREATE_DELIVERY_RESOURCE_PATH.replace(":sessionId", userSessionId);
-				var trackPath = TRACK_DELIVERY_RESOURCE_PATH.replace(":sessionId", userSessionId);
-				reply.put("sessionId", userSessionId);
-				reply.put("sessionLink", USER_SESSIONS_RESOURCE_PATH + "/" + userSessionId);
-				reply.put("createDeliveryLink", createPath);
-				reply.put("trackDeliveryLink", trackPath);
-				sendReply(ctx.response(), reply);
-			}).onFailure((f) -> {
-				reply.put("result", "login-failed");
-				reply.put("error", f.getMessage());
-				sendReply(ctx.response(), reply);
-			});			
-		}), context);
+		this.handleRequest(ctx -> {
+			final Promise<Void> promise = Promise.promise();
+			ctx.request().handler(buf -> {
+				JsonObject userInfo = buf.toJsonObject();
+				logger.info("Payload: " + userInfo);
+				String userId = ctx.pathParam("accountId");
+				String password = userInfo.getString("password");
+				var reply = new JsonObject();
+				this.vertx.executeBlocking(() -> this.lobbyService.login(new UserId(userId), password))
+						.onSuccess((userSessionId) -> {
+							reply.put("result", "ok");
+							var createPath = CREATE_DELIVERY_RESOURCE_PATH.replace(":sessionId", userSessionId);
+							var trackPath = TRACK_DELIVERY_RESOURCE_PATH.replace(":sessionId", userSessionId);
+							reply.put("sessionId", userSessionId);
+							reply.put("sessionLink", USER_SESSIONS_RESOURCE_PATH + "/" + userSessionId);
+							reply.put("createDeliveryLink", createPath);
+							reply.put("trackDeliveryLink", trackPath);
+							sendReply(ctx.response(), reply);
+							promise.complete();
+						}).onFailure((f) -> {
+							reply.put("result", "login-failed");
+							reply.put("error", f.getMessage());
+							sendReply(ctx.response(), reply);
+							promise.fail(f);
+						});
+			});
+			return promise.future();
+		}, context);
 	}
 	
 	
@@ -226,30 +243,37 @@ public class APIGatewayController extends VerticleBase  {
 	 */
 	protected void createNewDelivery(final RoutingContext context) {
 		logger.info("Create delivery request - " + context.currentRoute().getPath());
-		this.handleRequest(ctx -> ctx.request().handler(buf -> {
-			final JsonObject deliveryDetailJson = buf.toJsonObject();
-			String userSessionId = ctx.pathParam("sessionId");
-			var reply = new JsonObject();
-			final Optional<Calendar> expectedShippingMoment = DeliveryJsonConverter.getExpectedShippingMoment(deliveryDetailJson);
-			vertx.executeBlocking(() -> this.lobbyService.createNewDelivery(
-					userSessionId,
-					deliveryDetailJson.getNumber("weight").doubleValue(),
-					DeliveryJsonConverter.getAddress(deliveryDetailJson, "startingPlace"),
-					DeliveryJsonConverter.getAddress(deliveryDetailJson, "destinationPlace"),
-					expectedShippingMoment
-			)).onSuccess((deliveryId) -> {
-				reply.put("result", "ok");
-				reply.put("deliveryId", deliveryId.id());
-				reply.put("deliveryLink", DELIVERIES_RESOURCE_PATH + "/" + deliveryId.id());
-				reply.put("trackDeliveryLink",
-						TRACK_DELIVERY_RESOURCE_PATH.replace(":sessionId", userSessionId));
-				sendReply(ctx.response(), reply);
-			}).onFailure((f) -> {
-				reply.put("result", "error");
-				reply.put("error", f.getMessage());
-				sendReply(ctx.response(), reply);
+		this.handleRequest(ctx -> {
+			final Promise<Void> promise = Promise.promise();
+			ctx.request().handler(buf -> {
+				final JsonObject deliveryDetailJson = buf.toJsonObject();
+				String userSessionId = ctx.pathParam("sessionId");
+				var reply = new JsonObject();
+				final Optional<Calendar> expectedShippingMoment =
+						DeliveryJsonConverter.getExpectedShippingMoment(deliveryDetailJson);
+				vertx.executeBlocking(() -> this.lobbyService.createNewDelivery(
+						userSessionId,
+						deliveryDetailJson.getNumber("weight").doubleValue(),
+						DeliveryJsonConverter.getAddress(deliveryDetailJson, "startingPlace"),
+						DeliveryJsonConverter.getAddress(deliveryDetailJson, "destinationPlace"),
+						expectedShippingMoment
+				)).onSuccess((deliveryId) -> {
+					reply.put("result", "ok");
+					reply.put("deliveryId", deliveryId.id());
+					reply.put("deliveryLink", DELIVERIES_RESOURCE_PATH + "/" + deliveryId.id());
+					reply.put("trackDeliveryLink",
+							TRACK_DELIVERY_RESOURCE_PATH.replace(":sessionId", userSessionId));
+					sendReply(ctx.response(), reply);
+					promise.complete();
+				}).onFailure((f) -> {
+					reply.put("result", "error");
+					reply.put("error", f.getMessage());
+					sendReply(ctx.response(), reply);
+					promise.fail(f);
+				});
 			});
-		}), context);
+			return promise.future();
+		}, context);
 	}
 
 	/**
@@ -260,23 +284,30 @@ public class APIGatewayController extends VerticleBase  {
 	 */
 	protected void trackDelivery(final RoutingContext context) {
 		logger.info("Track delivery request - " + context.currentRoute().getPath());
-		this.handleRequest(ctx -> ctx.request().handler(buf -> {
-			final String userSessionId = ctx.pathParam("sessionId");
-			final String deliveryId = buf.toJsonObject().getString("deliveryId");
-			final JsonObject reply = new JsonObject();
-			vertx.executeBlocking(() -> this.lobbyService.trackDelivery(userSessionId, new DeliveryId(deliveryId)))
-					.onSuccess((trackingSessionId) -> {
-				reply.put("result", "ok");
-				reply.put("trackingSessionId", trackingSessionId);
-				reply.put("trackingSessionLink", DELIVERIES_RESOURCE_PATH + "/" + deliveryId + "/" + trackingSessionId);
-				sendReply(ctx.response(), reply);
-			}).onFailure((f) -> {
-				reply.put("result", "error");
-				reply.put("error", f.getMessage());
-				sendReply(ctx.response(), reply);
-			});			
-		}), context);
-	}	
+		this.handleRequest(ctx -> {
+			final Promise<Void> promise = Promise.promise();
+			ctx.request().handler(buf -> {
+				final String userSessionId = ctx.pathParam("sessionId");
+				final String deliveryId = buf.toJsonObject().getString("deliveryId");
+				final JsonObject reply = new JsonObject();
+				vertx.executeBlocking(() -> this.lobbyService.trackDelivery(userSessionId, new DeliveryId(deliveryId)))
+						.onSuccess((trackingSessionId) -> {
+							reply.put("result", "ok");
+							reply.put("trackingSessionId", trackingSessionId);
+							reply.put("trackingSessionLink",
+									DELIVERIES_RESOURCE_PATH + "/" + deliveryId + "/" + trackingSessionId);
+							sendReply(ctx.response(), reply);
+							promise.complete();
+						}).onFailure((f) -> {
+							reply.put("result", "error");
+							reply.put("error", f.getMessage());
+							sendReply(ctx.response(), reply);
+							promise.fail(f);
+						});
+			});
+			return promise.future();
+		}, context);
+	}
 	
 	/**
 	 * 
@@ -286,20 +317,26 @@ public class APIGatewayController extends VerticleBase  {
 	 */
 	protected void getDeliveryDetail(final RoutingContext context) {
 		logger.info("get delivery detail");
-		this.handleRequest(ctx -> ctx.request().endHandler(h -> {
-			final DeliveryId deliveryId = new DeliveryId(ctx.pathParam("deliveryId"));
-			var reply = new JsonObject();
-			this.vertx.executeBlocking(() -> this.deliveryService.getDeliveryDetail(deliveryId))
-					.onSuccess((deliveryDetail) -> {
-				reply.put("result", "ok");
-				reply.put("deliveryDetail", DeliveryJsonConverter.toJson(deliveryDetail));
-				sendReply(ctx.response(), reply);
-			}).onFailure((f) -> {
-				reply.put("result", "error");
-				reply.put("error", f.getMessage());
-				sendReply(ctx.response(), reply);
+		this.handleRequest(ctx -> {
+			final Promise<Void> promise = Promise.promise();
+			ctx.request().endHandler(h -> {
+				final DeliveryId deliveryId = new DeliveryId(ctx.pathParam("deliveryId"));
+				var reply = new JsonObject();
+				this.vertx.executeBlocking(() -> this.deliveryService.getDeliveryDetail(deliveryId))
+						.onSuccess((deliveryDetail) -> {
+							reply.put("result", "ok");
+							reply.put("deliveryDetail", DeliveryJsonConverter.toJson(deliveryDetail));
+							sendReply(ctx.response(), reply);
+							promise.complete();
+						}).onFailure((f) -> {
+							reply.put("result", "error");
+							reply.put("error", f.getMessage());
+							sendReply(ctx.response(), reply);
+							promise.fail(f);
+						});
 			});
-		}), context);
+			return promise.future();
+		}, context);
 	}
 
 	/**
@@ -310,33 +347,40 @@ public class APIGatewayController extends VerticleBase  {
 	 */
 	protected void getDeliveryStatus(final RoutingContext context) {
 		logger.info("GetDeliveryStatus request - " + context.currentRoute().getPath());
-		this.handleRequest(ctx -> ctx.request().endHandler(h -> {
-			final JsonObject reply = new JsonObject();
-			final DeliveryId deliveryId = new DeliveryId(ctx.pathParam("deliveryId"));
-			final String trackingSessionId = ctx.pathParam("trackingSessionId");
-			this.vertx.executeBlocking(() -> this.deliveryService.getDeliveryStatus(deliveryId, trackingSessionId))
-					.onSuccess((deliveryStatus) -> {
-				reply.put("result", "ok");
-				final JsonObject deliveryJson = new JsonObject();
-				deliveryJson.put("deliveryId", deliveryId.id());
-				deliveryJson.put("deliveryState", deliveryStatus.getState().getLabel());
-				try {
-					deliveryJson.put("timeLeft", deliveryStatus.getTimeLeft().days() + " days left");
-				} catch (final DeliveryNotShippedYetException ignored) {}
-				reply.put("deliveryStatus", deliveryJson);
-				sendReply(ctx.response(), reply);
-			}).onFailure(f -> {
-				if (f instanceof TrackingSessionNotFoundException) {
-					reply.put("result", "error");
-					reply.put("error", "tracking-session-not-present");
-					sendReply(ctx.response(), reply);
-				} else {
-					reply.put("result", "error");
-					reply.put("error", f.getMessage());
-					sendReply(ctx.response(), reply);
-				}
+		this.handleRequest(ctx -> {
+			final Promise<Void> promise = Promise.promise();
+			ctx.request().endHandler(h -> {
+				final JsonObject reply = new JsonObject();
+				final DeliveryId deliveryId = new DeliveryId(ctx.pathParam("deliveryId"));
+				final String trackingSessionId = ctx.pathParam("trackingSessionId");
+				this.vertx.executeBlocking(() -> this.deliveryService.getDeliveryStatus(deliveryId, trackingSessionId))
+						.onSuccess((deliveryStatus) -> {
+							reply.put("result", "ok");
+							final JsonObject deliveryJson = new JsonObject();
+							deliveryJson.put("deliveryId", deliveryId.id());
+							deliveryJson.put("deliveryState", deliveryStatus.getState().getLabel());
+							try {
+								deliveryJson.put("timeLeft", deliveryStatus.getTimeLeft().days() + " days left");
+							} catch (final DeliveryNotShippedYetException ignored) {
+							}
+							reply.put("deliveryStatus", deliveryJson);
+							sendReply(ctx.response(), reply);
+							promise.complete();
+						}).onFailure(f -> {
+							if (f instanceof TrackingSessionNotFoundException) {
+								reply.put("result", "error");
+								reply.put("error", "tracking-session-not-present");
+								sendReply(ctx.response(), reply);
+							} else {
+								reply.put("result", "error");
+								reply.put("error", f.getMessage());
+								sendReply(ctx.response(), reply);
+							}
+							promise.fail(f);
+						});
 			});
-		}), context);
+			return promise.future();
+		}, context);
 	}
 
 	/**
@@ -347,23 +391,29 @@ public class APIGatewayController extends VerticleBase  {
 	 */
 	protected void stopTrackingDelivery(final RoutingContext context) {
 		logger.info("Stop tracking delivery request - " + context.currentRoute().getPath());
-		this.handleRequest(ctx -> ctx.request().endHandler(h -> {
-			final DeliveryId deliveryId = new DeliveryId(ctx.pathParam("deliveryId"));
-			final String trackingSessionId = ctx.pathParam("trackingSessionId");
-			logger.info("Stop tracking delivery " + deliveryId.id());
-			var reply = new JsonObject();
-			this.vertx.executeBlocking(() -> {
-				this.deliveryService.stopTrackingDelivery(deliveryId, trackingSessionId);
-				return null;
-			}).onSuccess((x) -> {
-				reply.put("result", "ok");
-				sendReply(ctx.response(), reply);
-			}).onFailure(f -> {
-				reply.put("result", "error");
-				reply.put("error", f.getMessage());
-				sendReply(ctx.response(), reply);
+		this.handleRequest(ctx -> {
+			final Promise<Void> promise = Promise.promise();
+			ctx.request().endHandler(h -> {
+				final DeliveryId deliveryId = new DeliveryId(ctx.pathParam("deliveryId"));
+				final String trackingSessionId = ctx.pathParam("trackingSessionId");
+				logger.info("Stop tracking delivery " + deliveryId.id());
+				var reply = new JsonObject();
+				this.vertx.executeBlocking(() -> {
+					this.deliveryService.stopTrackingDelivery(deliveryId, trackingSessionId);
+					return null;
+				}).onSuccess((x) -> {
+					reply.put("result", "ok");
+					sendReply(ctx.response(), reply);
+					promise.complete();
+				}).onFailure(f -> {
+					reply.put("result", "error");
+					reply.put("error", f.getMessage());
+					sendReply(ctx.response(), reply);
+					promise.fail(f);
+				});
 			});
-		}), context);
+			return promise.future();
+		}, context);
 	}
 
 	/**
@@ -408,14 +458,15 @@ public class APIGatewayController extends VerticleBase  {
 		});
 	}
 
-	private void handleRequest(final Consumer<RoutingContext> handleContext, final RoutingContext context) {
+	private void handleRequest(final Function<RoutingContext, Future<Void>> handleContext, final RoutingContext context) {
 		final long initialTime = System.nanoTime();
-		handleContext.accept(context);
-		this.notifyNewRESTRequest(System.nanoTime() - initialTime);
+		handleContext.apply(context).onComplete(res ->
+				this.notifyNewRESTRequest(System.nanoTime() - initialTime, res.succeeded()));
 	}
 
-	private void notifyNewRESTRequest(final long responseTimeInNanoseconds) {
-		this.observers.forEach(obs -> obs.notifyNewRESTRequest(TimeUnit.NANOSECONDS.toMillis(responseTimeInNanoseconds)));
+	private void notifyNewRESTRequest(final long responseTimeInNanoseconds, boolean success) {
+		this.observers.forEach(obs ->
+				obs.notifyNewRESTRequest(TimeUnit.NANOSECONDS.toMillis(responseTimeInNanoseconds), success));
 	}
 
 	private void notifyAccountCircuitStatus(final boolean isCircuitOpen) {

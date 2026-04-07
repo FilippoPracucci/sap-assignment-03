@@ -12,6 +12,7 @@ import java.io.IOException;
 public class PrometheusControllerObserver implements ControllerObserver {
 
 	private final Counter nTotalNumberOfRESTRequests;
+	private final Counter nTotalNumberOfSuccessfulRESTRequests;
 	private final Counter totalRequestResponseTime;
 	private final Gauge isAccountCircuitOpen;
 
@@ -21,6 +22,11 @@ public class PrometheusControllerObserver implements ControllerObserver {
 		this.nTotalNumberOfRESTRequests = Counter.builder()
 				.name("api_gateway_num_rest_requests_total")
 				.help("Total number of REST requests received")
+				.register();
+
+		this.nTotalNumberOfSuccessfulRESTRequests = Counter.builder()
+				.name("api_gateway_num_successful_rest_requests_total")
+				.help("Total number of successful REST requests")
 				.register();
 
 		this.totalRequestResponseTime = Counter.builder()
@@ -43,8 +49,11 @@ public class PrometheusControllerObserver implements ControllerObserver {
 	}
 
 	@Override
-	public void notifyNewRESTRequest(final long responseTimeInMillis) {
+	public void notifyNewRESTRequest(final long responseTimeInMillis, boolean success) {
 		this.nTotalNumberOfRESTRequests.inc();
+		if (success) {
+			this.nTotalNumberOfSuccessfulRESTRequests.inc();
+		}
 		this.totalRequestResponseTime.inc(responseTimeInMillis);
 	}
 
