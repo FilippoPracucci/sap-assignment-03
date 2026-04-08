@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: delivery-service-deployment
+  namespace: shipping-on-the-air
+  labels:
+    app: delivery-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: delivery-service-pod
+  template:
+    metadata:
+      labels:
+        app: delivery-service-pod
+    spec:
+      containers:
+        - name:  delivery-service
+          image: delivery-service
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9002
+            - containerPort: 9400
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: delivery-service
+  namespace: shipping-on-the-air
+spec:
+  selector:
+    app: delivery-service-pod
+  ports:
+    - name: service-port
+      port: 9002
+      targetPort: 9002
+    - name: prometheus-port
+      port: 9400
+      targetPort: 9400
+  type: ClusterIP

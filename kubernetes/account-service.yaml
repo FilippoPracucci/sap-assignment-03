@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account-service-deployment
+  namespace: shipping-on-the-air
+  labels:
+    app: account-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: account-service-pod
+  template:
+    metadata:
+      labels:
+        app: account-service-pod
+    spec:
+      containers:
+        - name:  account-service
+          image: account-service
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9000
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: account-service
+  namespace: shipping-on-the-air
+spec:
+  selector:
+    app: account-service-pod
+  ports:
+    - port: 9000
+      targetPort: 9000
+  type: ClusterIP
+  

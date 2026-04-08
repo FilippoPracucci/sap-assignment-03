@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lobby-service-deployment
+  namespace: shipping-on-the-air
+  labels:
+    app: lobby-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lobby-service-pod
+  template:
+    metadata:
+      labels:
+        app: lobby-service-pod
+    spec:
+      containers:
+        - name:  lobby-service
+          image: lobby-service
+          imagePullPolicy: IfNotPresent
+          command: ["mvn", "exec:java", "-Dexec.mainClass=lobby_service.infrastructure.LobbyServiceMain"]
+          ports:
+            - containerPort: 9001
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: lobby-service
+  namespace: shipping-on-the-air
+spec:
+  selector:
+    app: lobby-service-pod
+  ports:
+    - port: 9001
+      targetPort: 9001
+  type: ClusterIP
