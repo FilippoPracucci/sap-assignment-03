@@ -1,4 +1,5 @@
 import io.vertx.core.json.JsonObject;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -11,13 +12,14 @@ public class PerformanceTest extends Setup {
 
     private static final String ACCOUNTS_RESOURCE_PATH = "/api/" + API_VERSION + "/accounts";
 
-    @Test
-    public void testAvgResponseTime() {
-        final int nConcurrentRequests = 50;
-        final int responseTimeThresholdInMs = 2000;
-        final List<Thread> threads = new ArrayList<>();
-        for (int i = 0; i < nConcurrentRequests; i++) {
-            threads.add(Thread.ofVirtual().start(() -> {
+    private final int nConcurrentRequests = 50;
+    private final List<Thread> threads = new ArrayList<>();
+
+    @BeforeEach
+    public void setup() {
+        super.setup();
+        for (int i = 0; i < this.nConcurrentRequests; i++) {
+            this.threads.add(Thread.ofVirtual().start(() -> {
                 try {
                     doPost(API_GATEWAY_URI + ACCOUNTS_RESOURCE_PATH, new JsonObject(Map.of(
                             "userName", "name",
@@ -28,23 +30,42 @@ public class PerformanceTest extends Setup {
                 }
             }));
         }
+        this.threads.forEach(t -> {
+            try {
+                t.join();
+            } catch (final InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Test
+    public void testThroughput() {
+        final int throughputThreshold = 40;
         try {
-            threads.forEach(t -> {
-                try {
-                    t.join();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            double nRequests = this.getMetricValue("api_gateway_num_rest_requests_total");
-            double totalResponseTimeInMs = this.getMetricValue("api_gateway_request_response_time_ms_total");
-            double averageResponseTimeInMs = (totalResponseTimeInMs / nRequests);
-            assertEquals(nConcurrentRequests, nRequests);
-            System.out.println("Average response time in ms: " + averageResponseTimeInMs);
-            double throughput = nConcurrentRequests / (averageResponseTimeInMs / 1000);
+            final double nRequests = this.getMetricValue("api_gateway_num_rest_requests_total");
+            final double totalResponseTimeInMs = this.getMetricValue("api_gateway_request_response_time_ms_total");
+            final double throughput = this.nConcurrentRequests / (totalResponseTimeInMs / nRequests / 1000);
             System.out.println("Throughput (requests per second): " + throughput);
-            assertTrue(averageResponseTimeInMs <= responseTimeThresholdInMs);
-        } catch (Exception e) {
+            assertEquals(this.nConcurrentRequests, nRequests);
+            assertTrue(throughput >= throughputThreshold);
+        } catch (final Exception e) {
+            e.printStackTrace();
+            fail();
+        }
+    }
+
+    @Test
+    public void testAvailability() {
+        final double availabilityThreshold = 0.99;
+        try {
+            final double nRequests = this.getMetricValue("api_gateway_num_rest_requests_total");
+            final double nSuccessfulRequests = this.getMetricValue("api_gateway_num_successful_rest_requests_total");
+            final double availability = nSuccessfulRequests /  nRequests;
+            System.out.println("Availability: " + availability);
+            assertEquals(this.nConcurrentRequests, nRequests);
+            assertTrue(availability >= availabilityThreshold);
+        } catch (final Exception e) {
             e.printStackTrace();
             fail();
         }

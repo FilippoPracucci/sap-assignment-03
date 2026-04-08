@@ -1,13 +1,25 @@
 **Quality attribute scenario**: Responsiveness
 
-**Feature**: Small average response time in case of overload
+**Feature**: High throughput in case of overload
 
 _when_ initiate 50 concurrent requests \
 _caused by_ 50 users \
 _occur in_ the system \
 _operating in_ normal operation \
 _then_ the system processes all requests \
-_so that_ the average response time is < 2000 milliseconds
+_so that_ the throughput is >= 40 requests/second
+
+
+**Quality attribute scenario**: Availability
+
+**Feature**: High availability in case of overload
+
+_when_ initiate 50 concurrent requests \
+_caused by_ 50 users \
+_occur in_ the system \
+_operating in_ normal operation \
+_then_ the system processes all requests \
+_so that_ at least the 99% of the requests should succeed
 
 
 **Quality attribute scenario**: Handling partial failures
