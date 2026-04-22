@@ -1,6 +1,7 @@
 package delivery_service.application;
 
 import delivery_service.domain.*;
+import delivery_service.domain.drone.DroneEnvironment;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -20,11 +21,13 @@ public class DeliveryServiceImpl implements DeliveryService, DeliveryObserver {
 	private final Deliveries deliveries;
     private final TrackingSessions trackingSessionRepository;
 	private final List<DeliveryServiceEventObserver> observers;
+	private final DroneEnvironment droneEnvironment;
 
     public DeliveryServiceImpl() {
     	this.trackingSessionRepository = new TrackingSessions();
 		this.deliveries = new Deliveries();
 		this.observers = new ArrayList<>();
+		this.droneEnvironment = new DroneEnvironment();
     }
 
 	@Override
@@ -57,7 +60,7 @@ public class DeliveryServiceImpl implements DeliveryService, DeliveryObserver {
 	@Override
 	public DeliveryId createNewDelivery(final double weight, final Address startingPlace,
 										final Address destinationPlace, final Optional<Calendar> expectedShippingMoment) {
-		final Delivery delivery = new DeliveryImpl(this.deliveryEventStore.getNextId(), weight, startingPlace,
+		final Delivery delivery = new DeliveryImpl(this.droneEnvironment, this.deliveryEventStore.getNextId(), weight, startingPlace,
 				destinationPlace, expectedShippingMoment, List.of(this));
 		logger.info("create New Delivery " + delivery.getId().id());
 		this.deliveries.addDelivery(delivery);
@@ -102,7 +105,7 @@ public class DeliveryServiceImpl implements DeliveryService, DeliveryObserver {
 	public void bindDeliveryRepository(final DeliveryEventStore store) {
 		this.deliveryEventStore = store;
 		this.deliveryEventStore.retrieveDeliveryEvents().forEach((deliveryId, events) -> {
-			final Delivery delivery = new DeliveryImpl(deliveryId);
+			final Delivery delivery = new DeliveryImpl(this.droneEnvironment, deliveryId);
 			events.forEach(delivery::applyEvent);
 			if (!delivery.getDeliveryStatus().getState().equals(DeliveryState.DELIVERED)) {
 				delivery.addDeliveryObserver(this);

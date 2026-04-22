@@ -1,12 +1,15 @@
 package delivery_service.domain;
 
 import static org.junit.jupiter.api.Assertions.*;
+
+import delivery_service.domain.drone.DroneEnvironment;
 import org.junit.jupiter.api.*;
 
 public class DeliveryTest {
 
     private static final double WEIGHT = 5.0;
 
+    private final DroneEnvironment droneEnvironment = new DroneEnvironment();
     private final Address startingPlace = new Address("via Roma", 50);
     private final Address destinationPlace = new Address("via Piave", 25);
     private final DeliveryId id = new DeliveryId("delivery-0");
@@ -42,7 +45,7 @@ public class DeliveryTest {
     }
 
     private DeliveryImpl createDelivery() {
-        final var delivery = new DeliveryImpl(this.id);
+        final var delivery = new DeliveryImpl(this.droneEnvironment, this.id);
         final DeliveryCreated event = new DeliveryCreated(this.id, new DeliveryDetailImpl(
                 this.id,
                 WEIGHT,

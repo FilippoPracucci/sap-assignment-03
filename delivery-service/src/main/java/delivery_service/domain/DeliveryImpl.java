@@ -1,21 +1,29 @@
 package delivery_service.domain;
 
+import delivery_service.domain.drone.DroneAgent;
+import delivery_service.domain.drone.DroneEnvironment;
+import delivery_service.domain.drone.env.EnvironmentEvent;
+import delivery_service.domain.drone.env.EnvironmentObserver;
+
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
-public class DeliveryImpl implements Delivery, DroneObserver {
+public class DeliveryImpl implements Delivery, EnvironmentObserver {
 
     private final DeliveryId id;
     private DeliveryDetail deliveryDetail;
     private MutableDeliveryStatus deliveryStatus;
     private final List<DeliveryObserver> observers;
+    private final DroneEnvironment droneEnvironment;
 
-    public DeliveryImpl(final DeliveryId deliveryId) {
+    public DeliveryImpl(final DroneEnvironment droneEnvironment, final DeliveryId deliveryId) {
+        this.droneEnvironment = droneEnvironment;
         this.id = deliveryId;
         this.observers = new ArrayList<>();
     }
 
     public DeliveryImpl(
+            final DroneEnvironment droneEnvironment,
             final DeliveryId deliveryId,
             final double weight,
             final Address startingPlace,
@@ -23,6 +31,7 @@ public class DeliveryImpl implements Delivery, DroneObserver {
             final Optional<Calendar> expectedShippingMoment,
             final List<DeliveryObserver> observers
     ) {
+        this.droneEnvironment =  droneEnvironment;
         this.id = deliveryId;
         this.deliveryDetail = new DeliveryDetailImpl(this.id, weight, startingPlace, destinationPlace,
                 expectedShippingMoment.orElseGet(TimeConverter::getNowAsCalendar));
@@ -76,9 +85,11 @@ public class DeliveryImpl implements Delivery, DroneObserver {
     }
 
     @Override
-    public synchronized void notifyDeliveryEvent(final DeliveryEvent event) {
-        this.applyEvent(event);
-        this.observers.forEach(obs -> obs.notifyDeliveryEvent(event));
+    public synchronized void notifyEvent(final EnvironmentEvent event) {
+        if (event instanceof DeliveryEvent) {
+            this.applyEvent((DeliveryEvent) event);
+            this.observers.forEach(obs -> obs.notifyDeliveryEvent((DeliveryEvent) event));
+        }
     }
 
     @Override
@@ -88,8 +99,9 @@ public class DeliveryImpl implements Delivery, DroneObserver {
             deliveryTime = Optional.of(this.deliveryStatus.getTimeLeft());
         } catch (final DeliveryNotShippedYetException ignored) {
         }
-        final Drone drone = new DroneImpl(this.deliveryDetail, deliveryTime);
-        drone.addDroneObserver(this);
+        final DroneAgent drone = new DroneAgent(this.droneEnvironment, this.deliveryDetail, deliveryTime);
+        this.droneEnvironment.register(this);
+        this.droneEnvironment.register(drone);
         Thread.ofVirtual().start(() -> {
             try {
                 if (TimeConverter.getZonedDateTime(this.deliveryDetail.expectedShippingMoment())

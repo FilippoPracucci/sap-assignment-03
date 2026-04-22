@@ -1,6 +1,7 @@
 package delivery_service.application;
 
 import delivery_service.domain.*;
+import delivery_service.domain.drone.DroneEnvironment;
 
 import java.util.Calendar;
 import java.util.Optional;
@@ -12,7 +13,7 @@ public class DeliveryServiceMock implements DeliveryService {
 
     public DeliveryServiceMock() {
         this.deliveryId = new DeliveryId("delivery-0");
-        this.delivery = new DeliveryImpl(this.deliveryId);
+        this.delivery = new DeliveryImpl(new DroneEnvironment(), this.deliveryId);
         this.delivery.applyEvent(new DeliveryCreated(
                 this.deliveryId,
                 new DeliveryDetailImpl(
