@@ -1,0 +1,469 @@
+asyncapi: 3.1.0
+info:
+  title: "Shipping on the Air - Delivery Service event channels"
+  version: '1.0.0'
+  description: |
+    Event-based API used by the Delivery Service
+channels:
+  createDeliveryRequests:
+    address: create-delivery-requests
+    description: Events about requests to create new deliveries
+    messages:
+      createDeliveryRequest:
+        $ref: '#/components/messages/createDeliveryRequest'
+  createDeliveryRequestsApproved:
+    address: create-delivery-requests-approved
+    description: Events about creating new deliveries request approved
+    messages:
+      createDeliveryRequestApproved:
+        $ref: '#/components/messages/createDeliveryRequestApproved'
+  createDeliveryRequestsRejected:
+    address: create-delivery-requests-rejected
+    description: Events about creating new deliveries request rejected
+    messages:
+      createDeliveryRequestRejected:
+        $ref: '#/components/messages/createDeliveryRequestRejected'
+  newDeliveryCreated:
+    address: new-delivery-created
+    description: Events about new delivery created
+    messages:
+      newDelivery:
+        $ref: '#/components/messages/newDelivery'
+  stopTrackingRequests:
+    address: stop-tracking-requests
+    description: Events about stopping delivery tracking
+    messages:
+      stopTrackingRequest:
+        $ref: '#/components/messages/stopTrackingRequest'
+  getDeliveryDetailRequests:
+    address: get-delivery-detail-requests
+    description: Events about getting delivery detail
+    messages:
+      getDeliveryDetailRequest:
+        $ref: '#/components/messages/getDeliveryDetailRequest'
+  getDeliveryStatusRequests:
+    address: get-delivery-status-requests
+    description: Events about getting delivery status
+    messages:
+      getDeliveryStatusRequest:
+        $ref: '#/components/messages/getDeliveryStatusRequest'
+  delivery-{deliveryId}-trackingRequests:
+    address: delivery-{deliveryId}-tracking-requests
+    description: Events about requests to track a delivery
+    parameters:
+      deliveryId:
+        description: Unique identifier of the delivery.
+    messages:
+      trackDeliveryRequest:
+        $ref: '#/components/messages/trackDeliveryRequest'
+  delivery-{deliveryId}-trackingRequestsApproved:
+    address: delivery-{deliveryId}-tracking-requests-approved
+    description: Events about track a delivery requests approved
+    parameters:
+      deliveryId:
+        description: Unique identifier of the delivery.
+    messages:
+      trackDeliveryRequestApproved:
+        $ref: '#/components/messages/trackDeliveryRequestApproved'
+  delivery-{deliveryId}-trackingRequestsRejected:
+    address: delivery-{deliveryId}-tracking-requests-rejected
+    description: Events about track a delivery requests rejected
+    parameters:
+      deliveryId:
+        description: Unique identifier of the delivery.
+    messages:
+      trackDeliveryRequestRejected:
+        $ref: '#/components/messages/trackDeliveryRequestRejected'
+  stopTracking-{trackingSessionId}-requestsApproved:
+    address: stop-tracking-{trackingSessionId}-requests-approved
+    description: Events about stopping delivery tracking requests approved
+    parameters:
+      trackingSessionId:
+        description: Unique identifier of the tracking session.
+    messages:
+      stopTrackingRequestApproved:
+        $ref: '#/components/messages/stopTrackingRequestApproved'
+  stopTracking-{trackingSessionId}-requestsRejected:
+    address: stop-tracking-{trackingSessionId}-requests-rejected
+    description: Events about stopping delivery tracking requests rejected
+    parameters:
+      trackingSessionId:
+        description: Unique identifier of the tracking session.
+    messages:
+      stopTrackingRequestRejected:
+        $ref: '#/components/messages/stopTrackingRequestRejected'
+  getDelivery-{deliveryId}-detailRequestsApproved:
+    address: get-delivery-{deliveryId}-detail-requests-approved
+    description: Events about getting delivery detail requests approved
+    parameters:
+      deliveryId:
+        description: Unique identifier of the delivery.
+    messages:
+      getDeliveryDetailRequestApproved:
+        $ref: '#/components/messages/getDeliveryDetailRequestApproved'
+  getDelivery-{deliveryId}-detailRequestsRejected:
+    address: get-delivery-{deliveryId}-detail-requests-rejected
+    description: Events about getting delivery detail requests rejected
+    parameters:
+      deliveryId:
+        description: Unique identifier of the delivery.
+    messages:
+      getDeliveryDetailRequestRejected:
+        $ref: '#/components/messages/getDeliveryDetailRequestRejected'
+  getDelivery-{trackingSessionId}-statusRequestsApproved:
+    address: get-delivery-{trackingSessionId}-status-requests-approved
+    description: Events about getting delivery status requests approved
+    parameters:
+      trackingSessionId:
+        description: Unique identifier of the tracking session.
+    messages:
+      getDeliveryStatusRequestApproved:
+        $ref: '#/components/messages/getDeliveryStatusRequestApproved'
+  getDelivery-{trackingSessionId}-statusRequestsRejected:
+    address: get-delivery-{trackingSessionId}-status-requests-rejected
+    description: Events about getting delivery status requests rejected
+    parameters:
+      trackingSessionId:
+        description: Unique identifier of the tracking session.
+    messages:
+      getDeliveryStatusRequestRejected:
+        $ref: '#/components/messages/getDeliveryStatusRequestRejected'
+  deliveryTracking-{trackingSessionId}-externalEvents:
+    address: delivery-tracking-{trackingSessionId}-external-events
+    description: Events about a specific delivery
+    parameters:
+      trackingSessionId:
+        description: Unique identifier of the tracking session.
+    messages:
+      deliveryEvent:
+        $ref: '#/components/messages/deliveryEvent'
+operations:
+  receiveCreateDeliveryRequest:
+    action: receive
+    channel:
+      $ref: '#/channels/createDeliveryRequests'
+  approveCreateDeliveryRequest:
+    action: send
+    channel:
+      $ref: '#/channels/createDeliveryRequestsApproved'
+  rejectCreateDeliveryRequest:
+    action: send
+    channel:
+      $ref: '#/channels/createDeliveryRequestsRejected'
+  informNewDelivery:
+    action: send
+    channel:
+      $ref: '#/channels/newDeliveryCreated'
+  receiveStopTrackingRequest:
+    action: receive
+    channel:
+      $ref: '#/channels/stopTrackingRequests'
+  receiveGetDeliveryDetailRequest:
+    action: receive
+    channel:
+      $ref: '#/channels/getDeliveryDetailRequests'
+  receiveGetDeliveryStatusRequest:
+    action: receive
+    channel:
+      $ref: '#/channels/getDeliveryStatusRequests'
+  receiveTrackDeliveryRequest:
+    action: receive
+    channel:
+      $ref: '#/channels/delivery-{deliveryId}-trackingRequests'
+  approveTrackDeliveryRequest:
+    action: send
+    channel:
+      $ref: '#/channels/delivery-{deliveryId}-trackingRequestsApproved'
+  rejectTrackDeliveryRequest:
+    action: send
+    channel:
+      $ref: '#/channels/delivery-{deliveryId}-trackingRequestsRejected'
+  approveStopTrackingRequest:
+    action: send
+    channel:
+      $ref: '#/channels/stopTracking-{trackingSessionId}-requestsApproved'
+  rejectStopTrackingRequest:
+    action: send
+    channel:
+      $ref: '#/channels/stopTracking-{trackingSessionId}-requestsRejected'
+  approveGetDeliveryDetailRequest:
+    action: send
+    channel:
+      $ref: '#/channels/getDelivery-{deliveryId}-detailRequestsApproved'
+  rejectGetDeliveryDetailRequest:
+    action: send
+    channel:
+      $ref: '#/channels/getDelivery-{deliveryId}-detailRequestsRejected'
+  approveGetDeliveryStatusRequest:
+    action: send
+    channel:
+      $ref: '#/channels/getDelivery-{trackingSessionId}-statusRequestsApproved'
+  rejectGetDeliveryStatusRequest:
+    action: send
+    channel:
+      $ref: '#/channels/getDelivery-{trackingSessionId}-statusRequestsRejected'
+  informNewDeliveryEvent:
+    action: send
+    channel:
+      $ref: '#/channels/deliveryTracking-{trackingSessionId}-externalEvents'
+components:
+  messages:
+    createDeliveryRequest:
+      name: createDeliveryRequest
+      title: Request event for creating a new delivery
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+        required:
+          - requestId
+    createDeliveryRequestApproved:
+      name: createDeliveryRequestApproved
+      title: Event for approved creating new delivery request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          deliveryId:
+            type: string
+            description: Unique identifier of the delivery created
+        required:
+          - requestId
+          - deliveryId
+    createDeliveryRequestRejected:
+      name: createDeliveryRequestRejected
+      title: Event for rejected creating new delivery request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          error:
+            type: string
+            description: Error message
+        required:
+          - requestId
+          - error
+    newDelivery:
+      name: newDelivery
+      title: Event for new delivery created
+      payload:
+        type: object
+        properties:
+          deliveryId:
+            type: string
+            description: Unique identifier of the delivery created
+        required:
+          - deliveryId
+    stopTrackingRequest:
+      name: stopTrackingRequest
+      title: Request event for stopping delivery tracking
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          deliveryId:
+            type: string
+            description: Unique identifier of the delivery created
+          trackingSessionId:
+            type: string
+            description: Unique identifier of the tracking session
+        required:
+          - requestId
+          - deliveryId
+          - trackingSessionId
+    getDeliveryDetailRequest:
+      name: getDeliveryDetailRequest
+      title: Request event for getting delivery detail
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          deliveryId:
+            type: string
+            description: Unique identifier of the delivery
+        required:
+          - requestId
+          - deliveryId
+    getDeliveryStatusRequest:
+      name: getDeliveryStatusRequest
+      title: Request event for getting delivery status
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          deliveryId:
+            type: string
+            description: Unique identifier of the delivery
+          trackingSessionId:
+            type: string
+            description: Unique identifier of the tracking session
+        required:
+          - requestId
+          - deliveryId
+          - trackingSessionId
+    trackDeliveryRequest:
+      name: trackDeliveryRequest
+      title: Request event for tracking a delivery
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          deliveryId:
+            type: string
+            description: Unique identifier of the delivery
+        required:
+          - requestId
+          - deliveryId
+    trackDeliveryRequestApproved:
+      name: trackDeliveryRequestApproved
+      title: Event for approved tracking a delivery request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          trackingSessionId:
+            type: string
+            description: Unique identifier of the tracking session
+        required:
+          - requestId
+          - trackingSessionId
+    trackDeliveryRequestRejected:
+      name: trackDeliveryRequestRejected
+      title: Event for rejected tracking a delivery request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          error:
+            type: string
+            description: Error message
+        required:
+          - requestId
+          - error
+    stopTrackingRequestApproved:
+      name: stopTrackingRequestApproved
+      title: Event for approved stopping delivery tracking request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+        required:
+          - requestId
+    stopTrackingRequestRejected:
+      name: stopTrackingRequestRejected
+      title: Event for rejected stopping delivery tracking request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          error:
+            type: string
+            description: Error message
+        required:
+          - requestId
+          - error
+    getDeliveryDetailRequestApproved:
+      name: getDeliveryDetailRequestApproved
+      title: Event for approved getting delivery detail request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          deliveryDetail:
+            type: object
+            description: Detail information of the delivery
+        required:
+          - requestId
+          - deliveryDetail
+    getDeliveryDetailRequestRejected:
+      name: getDeliveryDetailRequestRejected
+      title: Event for rejected getting delivery detail request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          error:
+            type: string
+            description: Error message
+        required:
+          - requestId
+          - error
+    getDeliveryStatusRequestApproved:
+      name: getDeliveryStatusRequestApproved
+      title: Event for approved getting delivery status request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          deliveryStatus:
+            type: object
+            description: Status information of the delivery
+        required:
+          - requestId
+          - deliveryStatus
+    getDeliveryStatusRequestRejected:
+      name: getDeliveryStatusRequestRejected
+      title: Event for rejected getting delivery status request
+      payload:
+        type: object
+        properties:
+          requestId:
+            type: string
+            description: Unique identifier of the request
+          error:
+            type: string
+            description: Error message
+        required:
+          - requestId
+          - error
+    deliveryEvent:
+      name: deliveryEvent
+      title: Event for a specific delivery
+      payload:
+        type: object
+        properties:
+          eventId:
+            type: string
+            description: Unique identifier of the event
+          eventType:
+            type: string
+            description: Type of the delivery event
+          deliveryId:
+            type: string
+            description: Unique identifier of the delivery
+          eventData:
+            type: object
+            description: Additional data related to the event
+        required:
+          - eventId
+          - eventType
+          - deliveryId
+          - eventData
