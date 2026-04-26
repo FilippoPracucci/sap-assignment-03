@@ -86,7 +86,7 @@ public class DeliveryImpl implements Delivery, EnvironmentObserver {
 
     @Override
     public synchronized void notifyEvent(final EnvironmentEvent event) {
-        if (event instanceof DeliveryEvent) {
+        if (event instanceof DeliveryEvent && ((DeliveryEvent) event).id().equals(this.id) ) {
             this.applyEvent((DeliveryEvent) event);
             this.observers.forEach(obs -> obs.notifyDeliveryEvent((DeliveryEvent) event));
         }
